@@ -322,8 +322,8 @@ app.config["DEBUG"] = True
 @app.route('/api/verifyURI', methods=['GET'])
 def verify_connection():
 	try:
-		url = flask.request.args.get('url')
-		test = ObjectTree(url)
+		url = flask.request.args.get('uri')
+		test = ObjectTree(url, 'connections.txt')
 		return flask.jsonify(success=True), 200
 	except:
 		return flask.jsonify({"success" : False, "error" : {"type" : "InvalidDatabaseCredentials", "message" : "Could not connect to database with given credentials"}})
@@ -333,8 +333,8 @@ def parse_request():
 	obj_id = flask.request.args.get('id')
 	obj_type = flask.request.args.get('type')
 	#depth_limit = int(flask.request.args.get('depth limit'))
-	url = flask.request.args.get('url')
-	file = flask.request.args.get('file path')
+	url = flask.request.args.get('uri')
+	# file = flask.request.args.get('file path')
 	#test = ObjectTree(url)
 	#output = test.find_nearby_nodes_bf(depth_limit, np.array([test.query_current_node_info(str(obj_id), obj_type)]), {})
 	test = ObjectTree(url, 'connections.txt')
@@ -345,8 +345,8 @@ def parse_request():
 
 @app.route('/api/getTypes', methods=['GET'])
 def return_types():
-	url = flask.request.args.get('url')
-	test = ObjectTree(url)
+	url = flask.request.args.get('uri')
+	test = ObjectTree(url, 'connections.txt')
 	output = test.get_tables()
 	test.cur.close()
 	test.con.close()
@@ -355,8 +355,8 @@ def return_types():
 
 @app.route('/api/getObjectInfo', methods=['GET'])
 def get_info():
-	url = flask.request.args.get('url')
-	test = ObjectTree(url)
+	url = flask.request.args.get('uri')
+	test = ObjectTree(url, 'connections.txt')
 	obj_id = flask.request.args.get('id')
 	obj_type = flask.request.args.get('type')
 	output = test.query_current_node_info(obj_id, obj_type)
