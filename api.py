@@ -251,12 +251,20 @@ class ObjectTree:
 				output[pointer]['pointers_from'].append(key)
 		return self.find_nearby_nodes_bf(layer_limit, working_objects, output, pointer=current)
 
+	def get_name(self, obj_id, obj_type):
+		try:
+			self.cur.execute("SELECT obj->>'name' FROM " + obj_type + " WHERE obj->>'id'='" + str(obj_id) + "'")
+			result = self.cur.fetchall()
+			print(result, obj_id, obj_type)
+			return result[0][0]
+		except Exception as e:
+			print(e)
 
 	def find_nearby_nodes_bf_graph(self, objs):
 		working_objects = np.array([])
 		output = {}
 		counter = 1
-		output[1] = {'type': objs[0].split()[0], 'id': objs[0].split()[1], 'pointers_from': []}
+		output[1] = {'type': objs[0].split()[0], 'id': objs[0].split()[1], 'pointers_from': [], 'name': self.get_name(objs[0].split()[1], objs[0].split()[0])}
 		for obj in objs:
 			parts = obj.split()
 			for obj_type in self.pointers_to[obj.split()[0]]:
@@ -267,7 +275,7 @@ class ObjectTree:
 				if result[0][0] != None:
 					working_objects = np.append(working_objects, obj_type + " " + result[0][0])
 					counter += 1
-					output[counter] = {'type': obj_type, 'id': result[0][0], 'pointers_from': [1]}
+					output[counter] = {'type': obj_type, 'id': result[0][0], 'pointers_from': [1], 'name': self.get_name(result[0][0], obj_type)}
 					
 				else:
 					try:
@@ -277,9 +285,9 @@ class ObjectTree:
 						for r in results:
 							working_objects = np.append(working_objects, obj_type + " " + r)
 							counter += 1
-							output[counter] = {'type': obj_type, 'id': r, 'pointers_from': [1]}
+							output[counter] = {'type': obj_type, 'id': r[0], 'pointers_from': [1], 'name': self.get_name(r[0], obj_type)}
 					except Exception as e:
-						print(e)
+						pass
 			try:
 				for obj_type in self.pointed_to_by[obj.split()[0]]:
 					sql_query = "SELECT obj->>'id' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "_id'='" + parts[1] + "'"
@@ -289,7 +297,7 @@ class ObjectTree:
 						if r[0] != None:
 							working_objects = np.append(working_objects, obj_type + " " + result[0][0])
 							counter += 1
-							output[counter] = {'type': obj_type, 'id': r, 'pointers_from': []}
+							output[counter] = {'type': obj_type, 'id': r[0], 'pointers_from': [], 'name': self.get_name(r[0], obj_type)}
 							output[1]['pointers_from'].append(counter)
 			except:
 				pass
