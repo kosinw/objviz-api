@@ -289,7 +289,8 @@ class ObjectTree:
 						if r[0] != None:
 							working_objects = np.append(working_objects, obj_type + " " + result[0][0])
 							counter += 1
-							output[counter] = {'type': obj_type, 'id': r, 'pointers_from': [1]}
+							output[counter] = {'type': obj_type, 'id': r, 'pointers_from': []}
+							output[1]['pointers_from'].append(counter)
 			except:
 				pass
 		print(working_objects)
