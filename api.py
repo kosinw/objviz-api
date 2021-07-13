@@ -372,4 +372,5 @@ def get_info():
 	test.con.close()
 	return flask.jsonify(output)
 
-app.run()
+if __name__ == "__main__":
+	app.run(threaded=True, port=5000)
