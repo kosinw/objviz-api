@@ -255,7 +255,7 @@ class ObjectTree:
 		try:
 			self.cur.execute("SELECT obj->>'name' FROM " + obj_type + " WHERE obj->>'id'='" + str(obj_id) + "'")
 			result = self.cur.fetchall()
-			print(result, obj_id, obj_type)
+			#print(result, obj_id, obj_type)
 			return result[0][0]
 		except Exception as e:
 			print(e)
@@ -301,7 +301,7 @@ class ObjectTree:
 							output[1]['pointers_from'].append(counter)
 			except:
 				pass
-		print(working_objects)
+		#print(working_objects)
 		return output
 
 
