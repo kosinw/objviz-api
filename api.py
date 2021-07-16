@@ -33,6 +33,7 @@ class ObjectTree:
 					self.pointed_to_by[value].append(key)
 				except:
 					self.pointed_to_by[value] = [key]
+		self.queries = {}
 		#pprint(self.pointers_to, self.pointed_to_by)
 
 
@@ -252,9 +253,10 @@ class ObjectTree:
 
 	def get_name(self, obj_id, obj_type):
 		try:
-			self.cur.execute("SELECT obj->>'name' FROM " + obj_type + " WHERE obj->>'id'='" + str(obj_id) + "'")
+			query_str = "SELECT obj->>'name' FROM " + obj_type + " WHERE obj->>'id'='" + str(obj_id) + "'"
+			#self.queries = np.append(self.queries, query_str)
+			self.cur.execute(query_str)
 			result = self.cur.fetchall()
-			#print(result, obj_id, obj_type)
 			return result[0][0]
 		except Exception as e:
 			pass
@@ -267,16 +269,14 @@ class ObjectTree:
 			output[0] = {'pointers_from': [], 'type': objs[0].split()[0], 'id': objs[0].split()[1], 'name': self.get_name(objs[0].split()[1], objs[0].split()[0])}
 			self.existing_nodes[objs[0]] = 0
 		working_objects = np.array([])
-		#print (objs)
-		#success_counter = 0
 		for obj in objs:
-			#print(self.existing_nodes)
 			current = self.existing_nodes[obj]
 			success_counter = len(output) - 1 - current
 			
 			parts = obj.split()
 			for obj_type in self.pointers_to[obj.split()[0]]:
 				sql_query = "SELECT obj->>'" + obj_type + "_id' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
+				self.queries[sql_query] = True
 				self.cur.execute(sql_query)
 				result = self.cur.fetchall()
 				#print(result)
@@ -301,6 +301,7 @@ class ObjectTree:
 					try:
 						sql_query = "SELECT obj->>'" + obj_type + "_ids' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
 						self.cur.execute(sql_query)
+						self.queries[sql_query] = True
 						results = json.loads(self.cur.fetchall()[0][0]).keys()
 						#print(results)
 						for r in results:
@@ -325,6 +326,7 @@ class ObjectTree:
 			try:
 				for obj_type in self.pointed_to_by[obj.split()[0]]:
 					sql_query = "SELECT obj->>'id' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "_id'='" + parts[1] + "'"
+					self.queries[sql_query] = True
 					self.cur.execute(sql_query)
 					results = self.cur.fetchall()
 					#print(results)
@@ -392,7 +394,7 @@ def parse_request():
 	output = test.find_nearby_nodes_bf_graph(np.array([obj_type + " " + obj_id]), depth_limit)
 	test.cur.close()
 	test.con.close()
-	return flask.jsonify(output)
+	return flask.jsonify({'output': output, 'SQL Queries': test.queries})
 
 @app.route('/api/getTypes', methods=['GET'])
 def return_types():
