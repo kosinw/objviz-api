@@ -265,12 +265,14 @@ class ObjectTree:
 	def find_nearby_nodes_bf_graph(self, objs, dep_limit, output = {}):
 		self.layers += 1
 		if self.layers > dep_limit or len(objs) == 0:
-			print('DONE')
 			return output
 		
 		if (self.layers == 1):
+			output = {}
 			output[0] = {'pointers_from': [], 'type': objs[0].split()[0], 'id': objs[0].split()[1], 'name': self.get_name(objs[0].split()[1], objs[0].split()[0])}
 			self.existing_nodes[objs[0]] = 0
+		else:
+			print('LAYER ' + str(self.layers - 1) + ' DONE')
 		working_objects = []
 		for obj in objs:
 			current = self.existing_nodes[obj]
@@ -316,6 +318,7 @@ class ObjectTree:
 				else:
 					try:
 						sql_query = "SELECT obj->>'" + obj_type + "_ids' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
+						
 						self.cur.execute(sql_query)
 						#print(sql_query)
 						self.queries[sql_query] = True
@@ -411,6 +414,7 @@ def parse_request():
 	obj_id = flask.request.args.get('id')
 	obj_type = flask.request.args.get('type')
 	depth_limit = int(flask.request.args.get('depthLimit'))
+	#print(depth_limit)
 	url = flask.request.args.get('uri')
 	# file = flask.request.args.get('file path')
 	#test = ObjectTree(url)
@@ -419,6 +423,8 @@ def parse_request():
 	output = test.find_nearby_nodes_bf_graph(np.array([obj_type + " " + obj_id]), depth_limit)
 	test.cur.close()
 	test.con.close()
+	print(str(len(output)) + " OBJECTS FOUND")
+	print('SENDING RESPONSE')
 	return flask.jsonify({'output': output, 'SQL Queries': test.queries})
 
 @app.route('/api/getTypes', methods=['GET'])
