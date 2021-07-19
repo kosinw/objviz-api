@@ -5,6 +5,7 @@ import numpy as np
 from pprint import pprint
 import json
 import traceback
+import logging
 
 
 class ObjectTree:
@@ -35,6 +36,11 @@ class ObjectTree:
 				except:
 					self.pointed_to_by[value] = [key]
 		self.queries = {}
+		self.root_logger= logging.getLogger()
+		self.root_logger.setLevel(logging.DEBUG) # or whatever
+		handler = logging.FileHandler('runtime.log', 'w', 'utf-8') # or whatever
+		handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever
+		self.root_logger.addHandler(handler)
 		#pprint(self.pointers_to, self.pointed_to_by)
 
 
@@ -265,6 +271,7 @@ class ObjectTree:
 	def find_nearby_nodes_bf_graph(self, objs, dep_limit, output = {}):
 		self.layers += 1
 		if self.layers > dep_limit or len(objs) == 0:
+			self.root_logger.info('LAYER ' + str(self.layers - 1) + ' DONE\n')
 			return output
 		
 		if (self.layers == 1):
@@ -272,7 +279,7 @@ class ObjectTree:
 			output[0] = {'pointers_from': [], 'type': objs[0].split()[0], 'id': objs[0].split()[1], 'name': self.get_name(objs[0].split()[1], objs[0].split()[0])}
 			self.existing_nodes[objs[0]] = 0
 		else:
-			print('LAYER ' + str(self.layers - 1) + ' DONE')
+			self.root_logger.info('LAYER ' + str(self.layers - 1) + ' DONE. SEARCHING LAYER ' + str(self.layers) + '...\n')
 		working_objects = []
 		for obj in objs:
 			current = self.existing_nodes[obj]
@@ -293,6 +300,7 @@ class ObjectTree:
 				self.queries[sql_query] = True
 				self.cur.execute(sql_query)
 				result = self.cur.fetchall()
+				#self.root_logger.info('SQL QUERY: ' + sql_query)
 				#print(len(result))
 				#print(result)
 				#print(result)
@@ -323,6 +331,7 @@ class ObjectTree:
 						#print(sql_query)
 						self.queries[sql_query] = True
 						results = json.loads(self.cur.fetchall()[0][0]).keys()
+						#self.root_logger.info('SQL QUERY: ' + sql_query)
 						#print(len(results))
 						#print(results)
 						for r in results:
@@ -343,6 +352,7 @@ class ObjectTree:
 									# output[size]['id'] = result[0][0]
 									# output[size]['type'] = obj_type
 					except Exception as e:
+						# self.root_logger.warning(e)
 						pass
 			try:
 				#print(self.pointed_to_by[obj.split()[0]])
@@ -352,6 +362,7 @@ class ObjectTree:
 					self.queries[sql_query] = True
 					self.cur.execute(sql_query)
 					results = self.cur.fetchall()
+					#self.root_logger.info('SQL QUERY: ' + sql_query)
 					#print(results)
 					#print(len(results))
 					#print(results)
@@ -423,8 +434,8 @@ def parse_request():
 	output = test.find_nearby_nodes_bf_graph(np.array([obj_type + " " + obj_id]), depth_limit)
 	test.cur.close()
 	test.con.close()
-	print(str(len(output)) + " OBJECTS FOUND")
-	print('SENDING RESPONSE')
+	test.root_logger.info(str(len(output)) + " OBJECTS FOUND")
+	test.root_logger.info('SENDING RESPONSE')
 	return flask.jsonify({'output': output, 'SQL Queries': test.queries})
 
 @app.route('/api/getTypes', methods=['GET'])

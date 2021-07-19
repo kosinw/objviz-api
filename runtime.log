@@ -1,0 +1,30 @@
+root LAYER 1 DONE. SEARCHING LAYER 2...
+
+root LAYER 2 DONE. SEARCHING LAYER 3...
+
+root LAYER 3 DONE. SEARCHING LAYER 4...
+
+root LAYER 4 DONE
+
+root 2001 OBJECTS FOUND
+root SENDING RESPONSE
+werkzeug 127.0.0.1 - - [19/Jul/2021 13:23:42] "GET /api/getNetwork?id=1610613249&type=adunit&uri=postgresql://postgres:7%2525thH)(nGf@localhost:5432/postgres&depthLimit=4 HTTP/1.1" 200 -
+t LAYER 2 DONE. SEARCHING LAYER 3...
+
+root LAYER 3 DONE. SEARCHING LAYER 4...
+
+root LAYER 4 DONE
+
+root 2001 OBJECTS FOUND
+root SENDING RESPONSE
+werkzeug 127.0.0.1 - - [19/Jul/2021 13:23:42] "GET /api/getNetwork?id=1610613249&type=adunit&uri=postgresql://postgres:7%2525thH)(nGf@localhost:5432/postgres&depthLimit=4 HTTP/1.1" 200 -
+
+root LAYER 2 DONE. SEARCHING LAYER 3...
+
+root LAYER 3 DONE. SEARCHING LAYER 4...
+
+root LAYER 4 DONE
+
+root 2001 OBJECTS FOUND
+root SENDING RESPONSE
+werkzeug 127.0.0.1 - - [19/Jul/2021 13:23:42] "GET /api/getNetwork?id=1610613249&type=adunit&uri=postgresql://postgres:7%2525thH)(nGf@localhost:5432/postgres&depthLimit=4 HTTP/1.1" 200 -
