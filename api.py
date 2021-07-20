@@ -268,7 +268,7 @@ class ObjectTree:
 		except Exception as e:
 			pass
 
-	def find_nearby_nodes_bf_graph(self, objs, dep_limit, output = {}):
+	def find_nearby_nodes_bf_graph(self, objs, dep_limit = 2, output = {}, obj_limit = 100):
 		self.layers += 1
 		if self.layers > dep_limit or len(objs) == 0:
 			self.root_logger.info('LAYER ' + str(self.layers - 1) + ' DONE\n')
@@ -304,6 +304,8 @@ class ObjectTree:
 						output[current + success_counter]['pointers_from'].append(self.existing_nodes[obj])
 					else:
 						output[current + success_counter] = {'pointers_from': [self.existing_nodes[obj]], 'id': result[0][0], 'type': obj_type, 'name': self.get_name(result[0][0], obj_type)}
+					if len(self.existing_nodes) >= obj_limit:
+						return output
 
 				else:
 					try:
@@ -321,11 +323,11 @@ class ObjectTree:
 								success_counter += 1
 								self.existing_nodes[working_objects[-1]] = current + success_counter
 								if (current + success_counter) in output:
-
 									output[self.existing_nodes[obj_type + " " + r]]['pointers_from'].append(self.existing_nodes[obj])
 								else:
 									output[current + success_counter] = {'pointers_from': [self.existing_nodes[obj]], 'id': r, 'type': obj_type, 'name': self.get_name(r, obj_type)}
-
+								if len(self.existing_nodes) >= obj_limit:
+									return output
 					except Exception as e:
 						pass
 			try:
@@ -347,11 +349,13 @@ class ObjectTree:
 								output[current]['pointers_from'].append(current + success_counter)
 								if (current + success_counter) not in output:
 									output[current + success_counter] = {'pointers_from': [], 'id': r[0], 'type': obj_type, 'name': r[1]}
+								if len(self.existing_nodes) >= obj_limit:
+									return output
 
 			except Exception as e:
 				pass
 
-		return self.find_nearby_nodes_bf_graph(working_objects, dep_limit, output)
+		return self.find_nearby_nodes_bf_graph(working_objects, dep_limit, output, obj_limit)
 
 
 #print(test.query_current_node_info('1610767417', 'adunitgroup'))
@@ -390,13 +394,17 @@ def parse_request():
 	obj_id = flask.request.args.get('id')
 	obj_type = flask.request.args.get('type')
 	depth_limit = int(flask.request.args.get('depthLimit'))
+	try:
+		obj_limit = int(flask.request.args.get('objectLimit'))
+	except:
+		obj_limit = 100
 	#print(depth_limit)
 	url = flask.request.args.get('uri')
 	# file = flask.request.args.get('filePath')
 	#test = ObjectTree(url)
 	#output = test.find_nearby_nodes_bf(depth_limit, np.array([test.query_current_node_info(str(obj_id), obj_type)]), {})
 	test = ObjectTree(url, 'connections.txt')
-	output = test.find_nearby_nodes_bf_graph(np.array([obj_type + " " + obj_id]), depth_limit)
+	output = test.find_nearby_nodes_bf_graph(np.array([obj_type + " " + obj_id]), depth_limit, obj_limit=obj_limit)
 	test.cur.close()
 	test.con.close()
 	test.root_logger.info(str(len(output)) + " OBJECTS FOUND")
