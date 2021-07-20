@@ -425,7 +425,7 @@ def parse_request():
 	test.con.close()
 	print(str(len(output)) + " OBJECTS FOUND")
 	print('SENDING RESPONSE')
-	return flask.jsonify({'output': output, 'SQL Queries': test.queries})
+	return flask.jsonify({'network': output, 'sqlQueries': test.queries})
 
 @app.route('/api/getTypes', methods=['GET'])
 def return_types():
