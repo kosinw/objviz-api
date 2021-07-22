@@ -87,149 +87,6 @@ class ObjectTree:
  			table_list.append(a[1])
  		return table_list
 	
-	#Finds nodes that connect to the current node (recursive)
-	#limit is limit on number of nodes
-	#obj_id is the object's id
-	#obj_type is the object's type
-	#uid is the object's uid (do uid implementation later)
-	#pointer is the object that pointed to the current object
-	def find_nearby_nodes_df(self, limit, obj_id, obj_type, uid=None, pointer = None):
-		if self.iteration_counter >= limit:
-			return "limit reached"
-		else:
-			info = self.query_current_node_info(obj_id, obj_type)
-			dict_id = str(obj_type) + str(obj_id)
-			
-			self.iteration_counter += 1
-			self.existing_nodes[dict_id] = self.iteration_counter
-			current = self.iteration_counter
-			self.print_node_info(info, self.iteration_counter, obj_type, obj_id, pointer)
-			for key in info.keys():
-				if key.endswith('id') and key.endswith('uid') == False and key != 'id':
-					try:
-						next_obj_type = self.key_to_obj_type(key)
-						next_obj_id = info[key]
-						next_dict_id = str(next_obj_type) + str(next_obj_id)
-						if next_dict_id in self.existing_nodes:
-							print("Node " + str(current) + " points to Node " + str(self.existing_nodes[next_dict_id]))
-							raise ValueError('node already exists')
-						else:
-							self.find_nearby_nodes(limit, next_obj_id, next_obj_type, pointer=current)
-					except Exception as e:
-						pass
-				elif key.endswith('ids') and key.endswith('uids') == False:
-					if isinstance(info[key], dict):
-	 					for next_object_id in info[key].keys():
-	 						try:
-	 							next_obj_type = self.key_to_obj_type(key)
-	 							next_dict_id = str(next_obj_type) + str(next_object_id)
-	 							if next_dict_id in self.existing_nodes:
-	 								print("Node " + str(current) + " points to Node " + str(self.existing_nodes[next_dict_id]))
-	 								raise ValueError('node already exists')
-	 							else:
-	 								self.find_nearby_nodes(limit, next_object_id, next_obj_type, pointer=current)
-	 						except Exception as e:
-	 							pass
-					elif isinstance(info[key], list):
-	 					for next_object_id in info[key]:
-	 						try:
-	 							next_obj_type = self.key_to_obj_type(key)
-	 							next_dict_id = str(next_obj_type) + str(next_object_id)
-	 							if next_dict_id in self.existing_nodes:
-	 								print("Node " + str(current) + " points to Node " + str(self.existing_nodes[next_dict_id]))
-	 								raise ValueError('node already exists')
-	 							else:
-	 								self.find_nearby_nodes(limit, next_object_id, next_obj_type, pointer=current)
-	 						except Exception as e:
-	 							pass
-
-	def find_nearby_nodes_bf(self, layer_limit, objs, output, uid=None, pointer = None):
-		if objs.shape[0] == 0 or self.layers > layer_limit:
-
-			return output
-		self.layers += 1
-		working_objects = np.array([])
-		current = self.iteration_counter
-		extra_pointers = {}
-		for obj in objs:
-			obj_id = obj['id']
-			try:
-				obj_type = obj['type']
-			except:
-				obj_type = 'customer'
-			if obj_type == 'user' or obj_type == 'order':
-				obj_type += '_'
-			info = self.query_current_node_info(obj_id, obj_type)
-			dict_id = str(obj_type) + str(obj_id)
-			self.iteration_counter += 1
-			self.existing_nodes[dict_id] = self.iteration_counter
-			current = self.iteration_counter
-			output = self.node_info_to_dict(info, self.iteration_counter, obj_type, obj_id, pointer, output)
-			#print(output)
-			success_counter = 1
-			for key in info.keys():
-				if key.endswith('id') and key.endswith('uid') == False and key != 'id':
-					try:
-						next_obj_type = self.key_to_obj_type(key)
-						next_obj_id = info[key]
-						next_dict_id = str(next_obj_type) + str(next_obj_id)
-
-						if next_dict_id in self.existing_nodes:
-							try:
-								extra_pointers[current].append(self.existing_nodes[next_dict_id])
-							except:
-								extra_pointers[current] = [self.existing_nodes[next_dict_id]]
-							raise ValueError('node already exists')
-						else:
-							this_obj = self.query_current_node_info(info[key], self.key_to_obj_type(key))
-							self.existing_nodes[next_dict_id] = self.iteration_counter + success_counter
-							success_counter += 1
-							working_objects = np.append(working_objects, this_obj)
-					except Exception as e:
-						pass
-				elif key.endswith('ids') and key.endswith('uids') == False:
-					if isinstance(info[key], dict):
-						#print(info[key].keys())
-						
-						for next_object_id in info[key].keys():
-							#print(next_object_id)
-							try:
-	 							next_obj_type = self.key_to_obj_type(key)
-	 							next_dict_id = str(next_obj_type) + str(next_object_id)
-	 							#print(self.existing_nodes)
-	 							if next_dict_id in self.existing_nodes:
-	 								extra_pointers[current] = np.append(np.asarray(extra_pointers[current]), self.existing_nodes[next_dict_id]).tolist()
-	 								raise ValueError('node already exists')
-	 							else:
-	 								#print(next_obj_id, next_obj_type)
-	 								this_obj = self.query_current_node_info(next_object_id, next_obj_type)
-	 								self.existing_nodes[next_dict_id] = self.iteration_counter + success_counter
-	 								success_counter += 1
-	 								working_objects = np.append(working_objects, this_obj)
-							except Exception as e:
-	 							pass
-					elif isinstance(info[key], list):
-	 					for next_object_id in info[key]:
-	 						try:
-	 							next_obj_type = self.key_to_obj_type(key)
-	 							next_dict_id = str(next_obj_type) + str(next_object_id)
-	 							if next_dict_id in self.existing_nodes:
-	 								extra_pointers[current] = np.append(np.asarray(extra_pointers[current]), self.existing_nodes[next_dict_id]).tolist()
-	 								raise ValueError('node already exists')
-	 							else:
-	 								this_obj = self.query_current_node_info(next_obj_id, next_obj_type)
-	 								self.existing_nodes[next_dict_id] = self.iteration_counter + success_counter
-	 								success_counter += 1
-	 								working_objects = np.append(working_objects, this_obj)
-	 						except Exception as e:
-	 							pass
-
-		#print(working_objects)
-		#print(extra_pointers)
-		for key in extra_pointers:
-			for pointer in extra_pointers[key]:
-				output[pointer]['pointers_from'].append(key)
-		return self.find_nearby_nodes_bf(layer_limit, working_objects, output, pointer=current)
 
 
 	def get_name(self, obj_id, obj_type, output = {}):
@@ -265,7 +122,10 @@ class ObjectTree:
 			#print(obj_type, obj)
 			if len(self.existing_nodes) >= obj_limit:
 				return output
-			sql_query = "SELECT obj->>'" + obj_type + "_id' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
+			if obj_type == 'user_' or obj_type == 'order_':
+				sql_query = "SELECT obj->>'" + obj_type + "id' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
+			else:
+				sql_query = "SELECT obj->>'" + obj_type + "_id' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
 			self.queries[sql_query] = True
 			self.cur.execute(sql_query)
 			result = self.cur.fetchall()
@@ -291,7 +151,10 @@ class ObjectTree:
 					#print(output[1])
 			else:
 				try:
-					sql_query = "SELECT obj->>'" + obj_type + "_ids' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
+					if obj_type == 'user_' or obj_type == 'order_':
+						sql_query = "SELECT obj->>'" + obj_type + "ids' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
+					else:
+						sql_query = "SELECT obj->>'" + obj_type + "_ids' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
 					
 					#print(sql_query)
 					self.cur.execute(sql_query)
@@ -330,7 +193,10 @@ class ObjectTree:
 		#pprint(output)
 		try:
 			for obj_type in self.pointed_to_by[parts[0]]:
-				sql_query = "SELECT obj->>'id', obj->>'name' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "_id'='" + parts[1] + "'"
+				if parts[0] == 'user_' or parts[0] == 'order_':
+					sql_query = "SELECT obj->>'id', obj->>'name' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "id'='" + parts[1] + "'"
+				else:
+					sql_query = "SELECT obj->>'id', obj->>'name' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "_id'='" + parts[1] + "'"
 				
 				self.cur.execute(sql_query)
 				results = self.cur.fetchall()
