@@ -231,12 +231,13 @@ class ObjectTree:
 	def get_name(self, obj_id, obj_type, output = {}):
 		try:
 			query_str = "SELECT obj->>'name' FROM " + obj_type + " WHERE obj->>'id'='" + str(obj_id) + "'"
-			#self.queries = np.append(self.queries, query_str)
+			
 			self.cur.execute(query_str)
-			result = self.cur.fetchall()
-			return result[0][0]
+			result = self.cur.fetchall()[0][0]
+			self.queries[query_str] = True
+			return result
 		except Exception as e:
-			pass
+			return None
 
 
 	def find_nearby_nodes_df_graph(self, obj_limit, obj, output = {}):
@@ -287,11 +288,12 @@ class ObjectTree:
 			else:
 				try:
 					sql_query = "SELECT obj->>'" + obj_type + "_ids' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
-					self.queries[sql_query] = True
+					
 					#print(sql_query)
 					self.cur.execute(sql_query)
 					#print(str(self.cur.fetchall()[0][0]), obj_type, sql_query)
 					results = json.loads(str(self.cur.fetchall()[0][0])).keys()
+					self.queries[sql_query] = True
 					#print(results)
 					#success_counter = len(self.existing_nodes) - 1 - current
 					#print(current, output[1])
@@ -325,9 +327,10 @@ class ObjectTree:
 		try:
 			for obj_type in self.pointed_to_by[parts[0]]:
 				sql_query = "SELECT obj->>'id', obj->>'name' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "_id'='" + parts[1] + "'"
-				self.queries[sql_query] = True
+				
 				self.cur.execute(sql_query)
 				results = self.cur.fetchall()
+				self.queries[sql_query] = True
 				print(results)
 				#print(results)
 				for r in results:
@@ -402,8 +405,9 @@ class ObjectTree:
 						sql_query = "SELECT obj->>'" + obj_type + "_ids' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
 						
 						self.cur.execute(sql_query)
-						self.queries[sql_query] = True
+						
 						results = json.loads(self.cur.fetchall()[0][0]).keys()
+						self.queries[sql_query] = True
 						for r in results:
 							#print(r)
 							if (obj_type + " " + r) in self.existing_nodes:
@@ -425,9 +429,10 @@ class ObjectTree:
 			try:
 				for obj_type in self.pointed_to_by[obj.split()[0]]:
 					sql_query = "SELECT obj->>'id', obj->>'name' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "_id'='" + parts[1] + "'"
-					self.queries[sql_query] = True
+					
 					self.cur.execute(sql_query)
 					results = self.cur.fetchall()
+					self.queries[sql_query] = True
 
 					for r in results:
 						if r[0] != None:
