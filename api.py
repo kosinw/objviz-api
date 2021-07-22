@@ -7,6 +7,7 @@ import json
 import traceback
 import logging
 import sys
+import bisect
 
 
 class ObjectTree:
@@ -29,13 +30,17 @@ class ObjectTree:
 				if value.endswith("\n"):
 					value = value[:-1]
 				try:
-					self.pointers_to[key].append(value)
+					bisect.insort(self.pointers_to[key], value)
+					#self.pointers_to[key].append(value)
 				except:
 					self.pointers_to[key] = [value]
 				try:
-					self.pointed_to_by[value].append(key)
+					bisect.insort(self.pointed_to_by[value], key)
+					#self.pointed_to_by[value].append(key)
 				except:
 					self.pointed_to_by[value] = [key]
+		#pprint(self.pointers_to)
+		#pprint(self.pointed_to_by)
 		self.queries = {}
 		self.root_logger= logging.getLogger()
 		self.root_logger.setLevel(logging.DEBUG) # or whatever
@@ -82,7 +87,6 @@ class ObjectTree:
  			table_list.append(a[1])
  		return table_list
 	
-
 	#Finds nodes that connect to the current node (recursive)
 	#limit is limit on number of nodes
 	#obj_id is the object's id
@@ -331,7 +335,7 @@ class ObjectTree:
 				self.cur.execute(sql_query)
 				results = self.cur.fetchall()
 				self.queries[sql_query] = True
-				print(results)
+				#print(results)
 				#print(results)
 				for r in results:
 					#print(r)
