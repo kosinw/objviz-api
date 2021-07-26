@@ -44,7 +44,11 @@ class ObjectTree:
 		self.root_logger.setLevel(logging.DEBUG) # or whatever
 		handler = logging.FileHandler('runtime.log', 'w', 'utf-8') # or whatever
 		handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever
+		second_handler = logging.StreamHandler(sys.stdout)
+		second_handler.setLevel(logging.DEBUG)
+		second_handler.setFormatter(logging.Formatter('%(name)s %(message)s'))
 		self.root_logger.addHandler(handler)
+		self.root_logger.addHandler(second_handler)
 
 
 	#Query all info about an object with a given id and type
@@ -86,7 +90,7 @@ class ObjectTree:
 	
 
 
-	def get_node_info(self, obj_id, obj_type, output = {}):
+	def get_node_info(self, obj_id, obj_type, output = {}, pointer = None):
 		try:
 			query_str = "SELECT obj->>'name', obj->>'status', obj->>'deleted' FROM " + obj_type + " WHERE obj->>'id'='" + str(obj_id) + "'"
 			#self.cur.execute(query_str)
@@ -96,6 +100,7 @@ class ObjectTree:
 			self.queries[query_str] = True
 			return result
 		except Exception as e:
+			self.root_logger.info(obj_type + " " + str(obj_id) + " (POINTED TO BY " + pointer + ") DID NOT PARSE, POSSIBLY DOES NOT EXIST IN DATABASE")
 			raise
 
 
@@ -129,7 +134,7 @@ class ObjectTree:
 					output[self.existing_nodes[obj_type + " " + result[0][0]]]['pointers_from'].append(current)
 			elif len(result) != 0 and result[0][0] != None:
 				try:
-					info = self.get_node_info(result[0][0], obj_type)
+					info = self.get_node_info(result[0][0], obj_type, pointer=obj)
 					this_index = len(self.existing_nodes)
 					
 					self.existing_nodes[obj_type + " " + str(result[0][0])] = this_index
@@ -154,7 +159,7 @@ class ObjectTree:
 								output[self.existing_nodes[obj_type + " " + r]]['pointers_from'].append(current)
 
 						else:
-							information = self.get_node_info(r, obj_type)
+							information = self.get_node_info(r, obj_type, pointer = obj)
 							current_index = len(self.existing_nodes)
 							if current_index >= obj_limit:
 								return output
@@ -235,7 +240,7 @@ class ObjectTree:
 						output[self.existing_nodes[obj_type + " " + result[0][0]]]['pointers_from'].append(self.existing_nodes[obj])
 				elif len(result) != 0 and result[0][0] != None:
 					try:
-						info = self.get_node_info(result[0][0], obj_type)
+						info = self.get_node_info(result[0][0], obj_type, pointer = obj)
 						#pprint(info)
 						working_objects.append(obj_type + " " + result[0][0])
 						success_counter += 1
@@ -273,7 +278,7 @@ class ObjectTree:
 								if self.existing_nodes[obj] not in output[self.existing_nodes[obj_type + " " + r]]['pointers_from']:
 									output[self.existing_nodes[obj_type + " " + r]]['pointers_from'].append(self.existing_nodes[obj])
 							else:
-								information = self.get_node_info(r, obj_type)
+								information = self.get_node_info(r, obj_type, pointer = obj)
 								#print(information, current)
 								working_objects.append(obj_type + " " + r)
 								success_counter += 1
