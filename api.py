@@ -39,8 +39,6 @@ class ObjectTree:
 					#self.pointed_to_by[value].append(key)
 				except:
 					self.pointed_to_by[value] = [key]
-		#pprint(self.pointers_to)
-		#pprint(self.pointed_to_by)
 		self.queries = {}
 		self.root_logger= logging.getLogger()
 		self.root_logger.setLevel(logging.DEBUG) # or whatever
@@ -56,7 +54,6 @@ class ObjectTree:
 	#SELECT obj FROM " + obj_type + " WHERE obj->>'id'='" + obj_id + "'
 	def query_current_node_info(self, obj_id, obj_type, uid=None, show_SQL = False):
 		query_str = "SELECT obj FROM " + str(obj_type) + " WHERE obj->>'id'='" + str(obj_id) + "'"
-		#query_str = "SELECT jsonb_object_agg(key, value) FROM jsonb_each(SELECT obj FROM " + str(obj_type) + " WHERE obj->>'id'='" + str(obj_id) + "') AS x WHERE key LIKE '%id' AND jsonb_typeof(value) != 'null'"
 		self.cur.execute(query_str)
 		result = self.cur.fetchall()
 		if show_SQL:
@@ -89,26 +86,26 @@ class ObjectTree:
 	
 
 
-	def get_name(self, obj_id, obj_type, output = {}):
+	def get_node_info(self, obj_id, obj_type, output = {}):
 		try:
-			query_str = "SELECT obj->>'name' FROM " + obj_type + " WHERE obj->>'id'='" + str(obj_id) + "'"
-			
+			query_str = "SELECT obj->>'name', obj->>'status', obj->>'deleted' FROM " + obj_type + " WHERE obj->>'id'='" + str(obj_id) + "'"
+			#self.cur.execute(query_str)
+			#print(self.cur.fetchall(), obj_type, obj_id)
 			self.cur.execute(query_str)
-			result = self.cur.fetchall()[0][0]
+			result = self.cur.fetchall()[0]
 			self.queries[query_str] = True
 			return result
 		except Exception as e:
-			return None
+			raise
 
 
 	def find_nearby_nodes_df_graph(self, obj_limit, obj, output = {}):
-		#pprint(output)
-		
 		if len(self.existing_nodes) >= obj_limit:
 			return output
 		if len(self.existing_nodes) == 0:
 			output = {}
-			output[0] = {'pointers_from': [], 'type': obj.split()[0], 'id': obj.split()[1], 'name': self.get_name(obj.split()[1], obj.split()[0])}
+			i = self.get_node_info(obj.split()[1], obj.split()[0])
+			output[0] = {'pointers_from': [], 'type': obj.split()[0], 'id': obj.split()[1], 'name': i[0], 'status': i[1], 'deleted': i[2]}
 			self.existing_nodes[obj] = 0
 
 		current = self.existing_nodes[obj]
@@ -117,9 +114,6 @@ class ObjectTree:
 		parts = obj.split()
 
 		for obj_type in self.pointers_to[parts[0]]:
-			
-			#one_err = False
-			#print(obj_type, obj)
 			if len(self.existing_nodes) >= obj_limit:
 				return output
 			if obj_type == 'user_' or obj_type == 'order_':
@@ -132,23 +126,18 @@ class ObjectTree:
 			
 			if len(result) != 0 and result[0][0] != None and (obj_type + " " + result[0][0]) in self.existing_nodes:
 				if current not in output[self.existing_nodes[obj_type + " " + result[0][0]]]['pointers_from']:
-					#print(current, output[1])
 					output[self.existing_nodes[obj_type + " " + result[0][0]]]['pointers_from'].append(current)
-					#print(current, output[1])
-				#print('here1')
 			elif len(result) != 0 and result[0][0] != None:
-				this_index = len(self.existing_nodes)
-				
-				self.existing_nodes[obj_type + " " + str(result[0][0])] = this_index
-
-				output[this_index] = {'pointers_from': [current], 'type': obj_type, 'id': result[0][0], 'name': self.get_name(result[0][0], obj_type)}
-			
-				#if current == 1:
-					#print (output[1])
-					#print(obj_type + " " + str(result[0][0]))
-				self.find_nearby_nodes_df_graph(obj_limit, (obj_type + " " + str(result[0][0])), output)
-				#sif current == 1:
-					#print(output[1])
+				try:
+					info = self.get_node_info(result[0][0], obj_type)
+					this_index = len(self.existing_nodes)
+					
+					self.existing_nodes[obj_type + " " + str(result[0][0])] = this_index
+					
+					output[this_index] = {'pointers_from': [current], 'type': obj_type, 'id': result[0][0], 'name': info[0], 'status': info[1], 'deleted': info[2]}
+					self.find_nearby_nodes_df_graph(obj_limit, (obj_type + " " + str(result[0][0])), output)
+				except:
+					pass
 			else:
 				try:
 					if obj_type == 'user_' or obj_type == 'order_':
@@ -156,59 +145,42 @@ class ObjectTree:
 					else:
 						sql_query = "SELECT obj->>'" + obj_type + "_ids' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
 					
-					#print(sql_query)
 					self.cur.execute(sql_query)
-					#print(str(self.cur.fetchall()[0][0]), obj_type, sql_query)
 					results = json.loads(str(self.cur.fetchall()[0][0])).keys()
 					self.queries[sql_query] = True
-					#print(results)
-					#success_counter = len(self.existing_nodes) - 1 - current
-					#print(current, output[1])
 					for r in results:
-						#print('here')
-						
 						if (obj_type + " " + r) in self.existing_nodes:
-							#print('here')
 							if self.existing_nodes[obj] not in output[self.existing_nodes[obj_type + " " + r]]['pointers_from']:
 								output[self.existing_nodes[obj_type + " " + r]]['pointers_from'].append(current)
 
 						else:
-							#print('here')
+							information = self.get_node_info(r, obj_type)
 							current_index = len(self.existing_nodes)
 							if current_index >= obj_limit:
 								return output
 							self.existing_nodes[obj_type + " " + r] = current_index
-							#print(self.existing_nodes)
-							#success_counter += 1
-
-							output[current_index] = {'pointers_from': [current], 'type': obj_type, 'id': r, 'name': self.get_name(r, obj_type)}
-							#pprint(output)
-							#pprint(output[1])
-							self.find_nearby_nodes_df_graph(obj_limit, (obj_type + " " + str(r)), output)
 							
-							#pprint(output[1])
+							output[current_index] = {'pointers_from': [current], 'type': obj_type, 'id': r, 'name': information[0], 'status': information[1], 'deleted': information[2]}
+							self.find_nearby_nodes_df_graph(obj_limit, (obj_type + " " + str(r)), output)
+
 				except Exception as e:
-					# one_err = True
 					pass
-		#pprint(output)
+
 		try:
 			for obj_type in self.pointed_to_by[parts[0]]:
 				if parts[0] == 'user_' or parts[0] == 'order_':
-					sql_query = "SELECT obj->>'id', obj->>'name' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "id'='" + parts[1] + "'"
+					sql_query = "SELECT obj->>'id', obj->>'name', obj->>'status', obj->>'deleted' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "id'='" + parts[1] + "'"
 				else:
-					sql_query = "SELECT obj->>'id', obj->>'name' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "_id'='" + parts[1] + "'"
+					sql_query = "SELECT obj->>'id', obj->>'name', obj->>'status', obj->>'deleted' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "_id'='" + parts[1] + "'"
 				
 				self.cur.execute(sql_query)
 				results = self.cur.fetchall()
 				self.queries[sql_query] = True
-				#print(results)
-				#print(results)
+
 				for r in results:
-					#print(r)
 					if r[0] != None:
 						if (obj_type + " " + r[0]) in self.existing_nodes:
 							if self.existing_nodes[obj_type + " " + r[0]] not in output[current]['pointers_from']:
-								#print(current, self.existing_nodes[obj_type + " " + r[0]])
 								output[current]['pointers_from'].append(self.existing_nodes[obj_type + " " + r[0]])
 						else:
 							this_obj_index = len(self.existing_nodes)
@@ -217,19 +189,17 @@ class ObjectTree:
 							self.existing_nodes[obj_type + " " + r[0]] = this_obj_index
 							output[current]['pointers_from'].append(this_obj_index)
 							if this_obj_index not in output:
-								output[this_obj_index] = {'pointers_from': [], 'type': obj_type, 'id': r[0], 'name': r[1]}
-							#print(this_obj_index)
+								output[this_obj_index] = {'pointers_from': [], 'type': obj_type, 'id': r[0], 'name': r[1], 'status': r[2], 'deleted': r[3]}
 							self.find_nearby_nodes_df_graph(obj_limit, (obj_type + " " + str(r[0])), output)
 		except Exception as e:
-			# if one_err:
-			# 	self.root_logger.warning("NON-FATAL ERROR WITH " + obj + ": ")
-			# exc_type, exc_obj, exc_tb = sys.exc_info()
-			# print(exc_type, exc_tb.tb_lineno)
 			pass
+
 		return output
 
 	def find_nearby_nodes_bf_graph(self, objs, dep_limit = 2, output = {}, obj_limit = 100):
 		self.layers += 1
+		#pprint(output)
+		#pprint(self.existing_nodes)
 		if self.layers > dep_limit or len(objs) == 0:
 			self.root_logger.info('LAYER ' + str(self.layers - 1) + ' DONE\n')
 			if len(objs) == 0:
@@ -238,7 +208,8 @@ class ObjectTree:
 		
 		if (self.layers == 1):
 			output = {}
-			output[0] = {'pointers_from': [], 'type': objs[0].split()[0], 'id': objs[0].split()[1], 'name': self.get_name(objs[0].split()[1], objs[0].split()[0])}
+			i = self.get_node_info(objs[0].split()[1], objs[0].split()[0])
+			output[0] = {'pointers_from': [], 'type': objs[0].split()[0], 'id': objs[0].split()[1], 'name': i[0], 'status': i[1], 'deleted': i[2]}
 			self.existing_nodes[objs[0]] = 0
 		else:
 			self.root_logger.info('LAYER ' + str(self.layers - 1) + ' DONE. SEARCHING LAYER ' + str(self.layers) + '...\n')
@@ -248,49 +219,70 @@ class ObjectTree:
 			success_counter = len(output) - 1 - current			
 			parts = obj.split()
 			for obj_type in self.pointers_to[obj.split()[0]]:
-				sql_query = "SELECT obj->>'" + obj_type + "_id' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
+				if obj_type == 'order_' or obj_type == 'user_':
+					sql_query = "SELECT obj->>'" + obj_type + "id' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
+				else:
+					sql_query = "SELECT obj->>'" + obj_type + "_id' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
+
 				self.queries[sql_query] = True
 				self.cur.execute(sql_query)
+
 				result = self.cur.fetchall()
+				
 
 				if len(result) != 0 and result[0][0] != None and (obj_type + " " + result[0][0]) in self.existing_nodes:
-
 					if self.existing_nodes[obj] not in output[self.existing_nodes[obj_type + " " + result[0][0]]]['pointers_from']:
 						output[self.existing_nodes[obj_type + " " + result[0][0]]]['pointers_from'].append(self.existing_nodes[obj])
 				elif len(result) != 0 and result[0][0] != None:
+					try:
+						info = self.get_node_info(result[0][0], obj_type)
+						#pprint(info)
+						working_objects.append(obj_type + " " + result[0][0])
+						success_counter += 1
+						#pprint(self.existing_nodes)
+						self.existing_nodes[working_objects[-1]] = current + success_counter
+						#pprint(self.existing_nodes)
+						if (current + success_counter) in output:
+							output[current + success_counter]['pointers_from'].append(self.existing_nodes[obj])
+						else:
+							#info = self.get_node_info(result[0][0], obj_type)
 
-					working_objects.append(obj_type + " " + result[0][0])
-					success_counter += 1
-					self.existing_nodes[working_objects[-1]] = current + success_counter
-					if (current + success_counter) in output:
-						output[current + success_counter]['pointers_from'].append(self.existing_nodes[obj])
-					else:
-						output[current + success_counter] = {'pointers_from': [self.existing_nodes[obj]], 'id': result[0][0], 'type': obj_type, 'name': self.get_name(result[0][0], obj_type)}
-					if len(self.existing_nodes) >= obj_limit:
-						self.root_logger.info("OBJECT LIMIT REACHED")
-						return output
+							#print(info)
+							output[current + success_counter] = {'pointers_from': [self.existing_nodes[obj]], 'id': result[0][0], 'type': obj_type, 'name': info[0], 'status': info[1], 'deleted': info[2]}
+
+						if len(self.existing_nodes) >= obj_limit:
+							self.root_logger.info("OBJECT LIMIT REACHED")
+							return output
+					except Exception as e:
+						#print()
+						#print(current)
+						pass
 
 				else:
 					try:
-						sql_query = "SELECT obj->>'" + obj_type + "_ids' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
-						
+						if obj_type == 'user_' or obj_type == 'order_':
+							sql_query = "SELECT obj->>'" + obj_type + "ids' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
+						else:
+							sql_query = "SELECT obj->>'" + obj_type + "_ids' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
 						self.cur.execute(sql_query)
 						
 						results = json.loads(self.cur.fetchall()[0][0]).keys()
 						self.queries[sql_query] = True
 						for r in results:
-							#print(r)
 							if (obj_type + " " + r) in self.existing_nodes:
 								if self.existing_nodes[obj] not in output[self.existing_nodes[obj_type + " " + r]]['pointers_from']:
 									output[self.existing_nodes[obj_type + " " + r]]['pointers_from'].append(self.existing_nodes[obj])
 							else:
+								information = self.get_node_info(r, obj_type)
+								#print(information, current)
 								working_objects.append(obj_type + " " + r)
 								success_counter += 1
 								self.existing_nodes[working_objects[-1]] = current + success_counter
 								if (current + success_counter) in output:
 									output[self.existing_nodes[obj_type + " " + r]]['pointers_from'].append(self.existing_nodes[obj])
 								else:
-									output[current + success_counter] = {'pointers_from': [self.existing_nodes[obj]], 'id': r, 'type': obj_type, 'name': self.get_name(r, obj_type)}
+									
+									output[current + success_counter] = {'pointers_from': [self.existing_nodes[obj]], 'id': r, 'type': obj_type, 'name': information[0], 'status': information[1], 'deleted': information[2]}
 								if len(self.existing_nodes) >= obj_limit:
 									self.root_logger.info("OBJECT LIMIT REACHED")
 									return output
@@ -298,7 +290,10 @@ class ObjectTree:
 						pass
 			try:
 				for obj_type in self.pointed_to_by[obj.split()[0]]:
-					sql_query = "SELECT obj->>'id', obj->>'name' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "_id'='" + parts[1] + "'"
+					if parts[0] == 'user_' or parts[0] == 'order_':
+						sql_query = "SELECT obj->>'id', obj->>'name', obj->>'status', obj->>'deleted' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "id'='" + parts[1] + "'"
+					else:
+						sql_query = "SELECT obj->>'id', obj->>'name', obj->>'status', obj->>'deleted' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "_id'='" + parts[1] + "'"
 					
 					self.cur.execute(sql_query)
 					results = self.cur.fetchall()
@@ -307,7 +302,7 @@ class ObjectTree:
 					for r in results:
 						if r[0] != None:
 							if (obj_type + " " + r[0]) in self.existing_nodes:
-								if self.existing_nodes[obj_type + " " + r[0]] not in output[current]['ponters_from']:
+								if self.existing_nodes[obj_type + " " + r[0]] not in output[current]['pointers_from']:
 									output[current]['pointers_from'].append(self.existing_nodes[obj_type + " " + r[0]])
 							else:
 								working_objects.append(obj_type + " " + r[0])
@@ -315,12 +310,14 @@ class ObjectTree:
 								self.existing_nodes[working_objects[-1]] = current + success_counter
 								output[current]['pointers_from'].append(current + success_counter)
 								if (current + success_counter) not in output:
-									output[current + success_counter] = {'pointers_from': [], 'id': r[0], 'type': obj_type, 'name': r[1]}
+									output[current + success_counter] = {'pointers_from': [], 'id': r[0], 'type': obj_type, 'name': r[1], 'status': r[2], 'deleted': r[3]}
 								if len(self.existing_nodes) >= obj_limit:
 									self.root_logger.info("OBJECT LIMIT REACHED")
 									return output
 
 			except Exception as e:
+				#print(e)
+				#print(current)
 				pass
 
 		return self.find_nearby_nodes_bf_graph(working_objects, dep_limit, output, obj_limit)
@@ -371,7 +368,6 @@ def parse_request():
 		df = True
 	else:
 		df = False
-	#print(obj_limit)
 	url = flask.request.args.get('uri')
 	# file = flask.request.args.get('filePath')
 	test = ObjectTree(url, 'connections.txt')
@@ -392,7 +388,6 @@ def return_types():
 	output = test.get_tables()
 	test.cur.close()
 	test.con.close()
-	#print(output)
 	return flask.jsonify(output)
 
 @app.route('/api/getObjectInfo', methods=['GET'])
