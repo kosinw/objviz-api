@@ -11,10 +11,17 @@ import bisect
 
 
 class ObjectTree:
-	#Initialize ObjectTree 
-	#Establish database connection and cursor objects
-	#database_url is the path or url to database
+	"""
+	A class that generates a network of connected objects
+	"""
 	def __init__(self, database_url, file_path):
+		"""
+		Initializes an ObjectTree object
+		:param database_url: The url of the database that's being connected to
+		:type database_url: str
+		:param file_path: The path to the file that contains the object type graph
+		:type file_path: str
+		"""
 		self.url = database_url
 		self.iteration_counter = 0
 		self.con = pcg2.connect(self.url)
@@ -41,22 +48,25 @@ class ObjectTree:
 					self.pointed_to_by[value] = [key]
 		self.queries = {}
 		self.root_logger= logging.getLogger()
-		self.root_logger.setLevel(logging.DEBUG) # or whatever
-		handler = logging.FileHandler('runtime.log', 'w', 'utf-8') # or whatever
-		handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever
+		self.root_logger.setLevel(logging.DEBUG)
+		handler = logging.FileHandler('runtime.log', 'w', 'utf-8')
+		handler.setFormatter(logging.Formatter('%(name)s %(message)s'))
 		second_handler = logging.StreamHandler(sys.stdout)
 		second_handler.setLevel(logging.DEBUG)
 		second_handler.setFormatter(logging.Formatter('%(name)s %(message)s'))
 		self.root_logger.addHandler(handler)
 		self.root_logger.addHandler(second_handler)
 
-
-	#Query all info about an object with a given id and type
-	#obj_id is the object's id
-	#obj_type is the object's type
-	#uid is the object's uid (do uid implementation later)
-	#SELECT obj FROM " + obj_type + " WHERE obj->>'id'='" + obj_id + "'
-	def query_current_node_info(self, obj_id, obj_type, uid=None, show_SQL = False):
+	def query_current_node_info(self, obj_id, obj_type):
+		"""
+		Queries all of the available information about a single object
+		:param obj_id: the id of the object
+		:type obj_id: str or int
+		:param obj_type: the type of the object
+		:type obj_type: str
+		:returns: all of the information about the object
+		:rtype: dict
+		"""
 		query_str = "SELECT obj FROM " + str(obj_type) + " WHERE obj->>'id'='" + str(obj_id) + "'"
 		self.cur.execute(query_str)
 		result = self.cur.fetchall()
@@ -64,10 +74,14 @@ class ObjectTree:
 			print("SQL QUERY: " + query_str)
 		return result[0][0]
 
-	#gets object type based on key
-	#A work in progress to say the best
-	#key is the key that the object type is to be extracted from
 	def key_to_obj_type(self, key):
+		"""
+		Gets an object's type based on the field name that points to it
+		:param key: the field name that points to an object type
+		:type key: str
+		:returns: the object type that the field name points to
+		:rtype: str
+		"""
 		if key.endswith('ids'):
 			key = key[0:-1]
 		if key == 'order_id' or key == 'user_id':
@@ -80,21 +94,35 @@ class ObjectTree:
 			return key[0:-3]
 
 	def get_tables(self):
- 		build = 'SELECT * FROM pg_catalog.pg_tables WHERE schemaname != \'pg_catalog\' AND schemaname != \'information_schema\';'
- 		self.cur.execute(build)
- 		total = self.cur.fetchall()
- 		table_list = []
- 		for a in total:
- 			table_list.append(a[1])
- 		return table_list
+		"""
+		Gets all table names from the database
+		:returns: All table names from the database
+		:rtype: list
+		"""
+		build = 'SELECT * FROM pg_catalog.pg_tables WHERE schemaname != \'pg_catalog\' AND schemaname != \'information_schema\';'
+		self.cur.execute(build)
+		total = self.cur.fetchall()
+		table_list = []
+		for a in total:
+			table_list.append(a[1])
+		return table_list
 	
 
 
-	def get_node_info(self, obj_id, obj_type, output = {}, pointer = None):
+	def get_node_info(self, obj_id, obj_type, pointer = None):
+		"""
+		Gets only crucial information from a given object (to be displayed in object preview in visualizer)
+		:param obj_id: the id of the object
+		:type obj_id: int or str
+		:param obj_type: the type of the object
+		:type obj_type: str
+		:param pointer: the object that points to the target object (in case the target object does not exist in database)
+		:type pointer: str
+		:returns: the name, status, deleted, and type_full fields of the object if possible. Else, raises error
+		:rtype: list (tuple)
+		"""
 		try:
 			query_str = "SELECT obj->>'name', obj->>'status', obj->>'deleted', obj->>'type_full' FROM " + obj_type + " WHERE obj->>'id'='" + str(obj_id) + "'"
-			#self.cur.execute(query_str)
-			#print(self.cur.fetchall(), obj_type, obj_id)
 			self.cur.execute(query_str)
 			result = self.cur.fetchall()[0]
 			self.queries[query_str] = True
@@ -105,10 +133,22 @@ class ObjectTree:
 
 
 	def find_nearby_nodes_df_graph(self, obj_limit, obj, output = {}, current_depth=0):
+		"""
+		Recursively generates a network of objects connected to one object, searching through database connections depth-first
+		:param obj_limit: the maximum number of objects to be added to the network
+		:type obj_limit: int
+		:param obj: the origninal object; the starting point of the network
+		:type obj: str
+		:param output: the running dictionary of objects as they are added to the network
+		:type output: dict
+		:param current_depth: the number of layers away from the starting object that the current iteration is; used for measuring greatest tree depth
+		:type current_depth: int
+		:returns: an indexed network of objects and their id, type, name, status, deleted, type_full, and the objects that point to them
+		:rtype: dict
+		"""
 		if current_depth >= self.layers:
 			self.layers = current_depth
 		if len(self.existing_nodes) >= obj_limit:
-			#self.layers -= 1
 			return output
 		if len(self.existing_nodes) == 0:
 			output = {}
@@ -205,9 +245,20 @@ class ObjectTree:
 		return output
 
 	def find_nearby_nodes_bf_graph(self, objs, dep_limit = 2, output = {}, obj_limit = 100):
+		"""
+		Recursively generates a network of objects connected to one object, searching through database connections breadth-first
+		:param objs: the objects that a given iteration is looking through
+		:type objs: list
+		:param dep_limit: the maximum depth that the search is allowed to reach
+		:type dep_limit: int
+		:param output: the running dictionary of objects as they are added to the network
+		:type output: dict
+		:param obj_limit: the maximum number of objects that can be in the generated network
+		:type obj_limit: int
+		:returns: an indexed network of objects and their id, type, name, status, deleted, type_full, and the objects that point to them
+		:rtype: dict
+		"""
 		self.layers+=1
-		#pprint(output)
-		#pprint(self.existing_nodes)
 		if self.layers > dep_limit or len(objs) == 0:
 			self.root_logger.info('LAYER ' + str(self.layers - 1) + ' DONE\n')
 			if len(objs) == 0:
@@ -246,26 +297,18 @@ class ObjectTree:
 				elif len(result) != 0 and result[0][0] != None:
 					try:
 						info = self.get_node_info(result[0][0], obj_type, pointer = obj)
-						#pprint(info)
 						working_objects.append(obj_type + " " + result[0][0])
 						success_counter += 1
-						#pprint(self.existing_nodes)
 						self.existing_nodes[working_objects[-1]] = current + success_counter
-						#pprint(self.existing_nodes)
 						if (current + success_counter) in output:
 							output[current + success_counter]['pointers_from'].append(self.existing_nodes[obj])
 						else:
-							#info = self.get_node_info(result[0][0], obj_type)
-
-							#print(info)
 							output[current + success_counter] = {'pointers_from': [self.existing_nodes[obj]], 'id': result[0][0], 'type': obj_type, 'name': info[0], 'status': info[1], 'deleted': info[2], 'type_full': info[3]}
 
 						if len(self.existing_nodes) >= obj_limit:
 							self.root_logger.info("OBJECT LIMIT REACHED")
 							return output
 					except Exception as e:
-						#print()
-						#print(current)
 						pass
 
 				else:
@@ -284,7 +327,6 @@ class ObjectTree:
 									output[self.existing_nodes[obj_type + " " + r]]['pointers_from'].append(self.existing_nodes[obj])
 							else:
 								information = self.get_node_info(r, obj_type, pointer = obj)
-								#print(information, current)
 								working_objects.append(obj_type + " " + r)
 								success_counter += 1
 								self.existing_nodes[working_objects[-1]] = current + success_counter
@@ -326,16 +368,20 @@ class ObjectTree:
 									return output
 
 			except Exception as e:
-				#print(e)
-				#print(current)
 				pass
 
 		return self.find_nearby_nodes_bf_graph(working_objects, dep_limit, output, obj_limit)
 
 	def get_output_stats(self, output):
+		"""
+		Produces statistics about the generated network of objects, including counts/frequencies of object types and subtypes and maximum depth
+		:param output: the generated network of objects
+		:type output: dict
+		:returns: statistics about the object network
+		:rtype: dict
+		"""
 		type_dict = {}
 		type_full_dict = {}
-		#pprint(output)
 		total = 0
 		for key in output.keys():
 			try:
@@ -355,7 +401,6 @@ class ObjectTree:
 					pass
 				elif k.startswith(key):
 					final_stats[key][k] = {'count': type_full_dict[k], 'percent_of_total': (type_full_dict[k]/total)*100, 'percent_of_' + key + '(s)': (type_full_dict[k]/type_dict[key])*100}
-		#pprint(final_stats)
 		return final_stats
 
 #print(test.query_current_node_info('1610767417', 'adunitgroup'))
@@ -404,7 +449,6 @@ def parse_request():
 	else:
 		df = False
 	url = flask.request.args.get('uri')
-	# file = flask.request.args.get('filePath')
 	test = ObjectTree(url, 'connections.txt')
 	
 	if df:
@@ -412,7 +456,6 @@ def parse_request():
 	else:
 		output = test.find_nearby_nodes_bf_graph(np.array([obj_type + " " + obj_id]), depth_limit, obj_limit=obj_limit)
 	max_depth = test.layers
-	#print(max_depth)
 	test.cur.close()
 	test.con.close()
 	test.root_logger.info(str(len(output)) + " OBJECTS FOUND")
