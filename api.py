@@ -70,8 +70,6 @@ class ObjectTree:
 		query_str = "SELECT obj FROM " + str(obj_type) + " WHERE obj->>'id'='" + str(obj_id) + "'"
 		self.cur.execute(query_str)
 		result = self.cur.fetchall()
-		if show_SQL:
-			print("SQL QUERY: " + query_str)
 		return result[0][0]
 
 	def key_to_obj_type(self, key):
