@@ -463,7 +463,7 @@ def parse_request():
 	test.con.close()
 	test.root_logger.info(str(len(output)) + " OBJECTS FOUND")
 	statistics = test.get_output_stats(output)
-	stats = {'types': statistics[0], 'max_depth': max_depth, 'total_not_deleted': statistics[1]}
+	stats = {'types': statistics[0], 'max_depth': max_depth, 'total_non-deleted_objects': statistics[1]}
 	test.root_logger.info('SENDING RESPONSE')
 	# if sql:
 	# 	return flask.jsonify({'network': output, 'sqlQueries': test.queries, 'statistics': stats})
