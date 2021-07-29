@@ -447,17 +447,21 @@ def parse_request():
 	# 	sql = True
 	# else:
 	# 	sql = False
-	if flask.request.args.get('depthFirst') in ["True", "true"]:
-		df = True
-	else:
-		df = False
+	
 	url = flask.request.args.get('uri')
 	test = ObjectTree(url, 'connections.txt')
 	
-	if df:
-		output = test.find_nearby_nodes_df_graph(obj_limit, (obj_type + " " + obj_id))
-	else:
-		output = test.find_nearby_nodes_bf_graph(np.array([obj_type + " " + obj_id]), depth_limit, obj_limit=obj_limit)
+	#FOR IMPLEMENTING DEPTH-FIRST QUERY:
+	# if flask.request.args.get('depthFirst') in ["True", "true"]:
+	# 	df = True
+	# else:
+	# 	df = False
+	# if df:
+	# 	output = test.find_nearby_nodes_df_graph(obj_limit, (obj_type + " " + obj_id))
+	# else:
+	# 	output = test.find_nearby_nodes_bf_graph(np.array([obj_type + " " + obj_id]), depth_limit, obj_limit=obj_limit)
+
+	output = test.find_nearby_nodes_bf_graph(np.array([obj_type + " " + obj_id]), depth_limit, obj_limit=obj_limit)
 	max_depth = test.layers
 	test.cur.close()
 	test.con.close()
