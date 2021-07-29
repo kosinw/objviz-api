@@ -23,12 +23,11 @@ class ObjectTree:
 		:type file_path: str
 		"""
 		self.url = database_url
-		self.iteration_counter = 0
 		self.con = pcg2.connect(self.url)
 		self.con.autocommit = True
 		self.cur = self.con.cursor()
-		self.existing_nodes = {}
-		self.layers = 0
+		self.existing_nodes = {} # stores objects that have already been found
+		self.layers = 0 # used to return max_depth at the end of both algorithms
 		self.pointers_to = {}
 		self.pointed_to_by = {}
 		with open(file_path) as file:
@@ -37,8 +36,8 @@ class ObjectTree:
 				if value.endswith("\n"):
 					value = value[:-1]
 				try:
-					bisect.insort(self.pointers_to[key], value)
-					#self.pointers_to[key].append(value)
+					bisect.insort(self.pointers_to[key], value) # alphabetizing generates more connections with "relevant" object types (accounts, adunits, etc.) that happen to come first alphabetically
+					#self.pointers_to[key].append(value) # to add types in "natural" order
 				except:
 					self.pointers_to[key] = [value]
 				try:
@@ -46,7 +45,7 @@ class ObjectTree:
 					#self.pointed_to_by[value].append(key)
 				except:
 					self.pointed_to_by[value] = [key]
-		self.queries = {}
+		self.queries = {} # holds SQL queries
 		self.root_logger= logging.getLogger()
 		self.root_logger.setLevel(logging.DEBUG)
 		handler = logging.FileHandler('runtime.log', 'w', 'utf-8')
@@ -72,6 +71,7 @@ class ObjectTree:
 		result = self.cur.fetchall()
 		return result[0][0]
 
+	#Not in use right now, but these are some of the exceptions to the objecttype_id format
 	def key_to_obj_type(self, key):
 		"""
 		Gets an object's type based on the field name that points to it
@@ -159,7 +159,7 @@ class ObjectTree:
 			self.root_logger.info(str(len(self.existing_nodes)) + " OBJECTS FOUND...")
 		parts = obj.split()
 
-		for obj_type in self.pointers_to[parts[0]]:
+		for obj_type in self.pointers_to[parts[0]]: # finding parent nodes that the current object points to
 			if len(self.existing_nodes) >= obj_limit:
 				return output
 			if obj_type == 'user_' or obj_type == 'order_':
@@ -213,7 +213,7 @@ class ObjectTree:
 					pass
 
 		try:
-			for obj_type in self.pointed_to_by[parts[0]]:
+			for obj_type in self.pointed_to_by[parts[0]]: # finding child nodes that point to current object
 				if parts[0] == 'user_' or parts[0] == 'order_':
 					sql_query = "SELECT obj->>'id', obj->>'name', obj->>'status', obj->>'deleted', obj->>'type_full' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "id'='" + parts[1] + "'"
 				else:
@@ -275,10 +275,10 @@ class ObjectTree:
 		working_objects = []
 		for obj in objs:
 			current = self.existing_nodes[obj]
-			success_counter = len(output) - 1 - current			
-			parts = obj.split()
-			for obj_type in self.pointers_to[obj.split()[0]]:
-				if obj_type == 'order_' or obj_type == 'user_':
+			success_counter = len(output) - 1 - current # used to keep track of next available index	
+			parts = obj.split() # each obj in the list stored as "objecttype objectid" (delimited by a space)
+			for obj_type in self.pointers_to[obj.split()[0]]: # adding parent nodes that the current object points to
+				if obj_type == 'order_' or obj_type == 'user_': #since ids stored under user_id and order_id fields
 					sql_query = "SELECT obj->>'" + obj_type + "id' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
 				else:
 					sql_query = "SELECT obj->>'" + obj_type + "_id' FROM " + parts[0] + " WHERE obj->>'id'='" + parts[1] + "'"
@@ -338,7 +338,7 @@ class ObjectTree:
 									return output
 					except Exception as e:
 						pass
-			try:
+			try: #adding child nodes that point to the object
 				for obj_type in self.pointed_to_by[obj.split()[0]]:
 					if parts[0] == 'user_' or parts[0] == 'order_':
 						sql_query = "SELECT obj->>'id', obj->>'name', obj->>'status', obj->>'deleted', obj->>'type_full' FROM " + obj_type + " WHERE obj->>'" + parts[0] + "id'='" + parts[1] + "'"
@@ -402,15 +402,6 @@ class ObjectTree:
 					final_stats[key + "(" + str(type_dict[key]) + "/" + str(int(np.rint((type_dict[key]/total)*100))) + "%)"][k + "(" + str(type_full_dict[k]) + "/" + str(int(np.rint((type_full_dict[k]/total)*100))) + "%)"] = {'count': type_full_dict[k], 'percent_of_total': (type_full_dict[k]/total)*100, 'percent_of_' + key + '(s)': (type_full_dict[k]/type_dict[key])*100}
 		return (final_stats, total)
 
-#print(test.query_current_node_info('1610767417', 'adunitgroup'))
-#adunitgroup 1610767417
-#account 537237219
-#adunit 536873591
-#site 1610870269
-#user_ 1610612857
-#deal 1610619602
-#customer 497
-
 #EMPTY TALBES IN DB DUMP:
 #acl, ad_deleted, ad_deleted_bak, adunit_deleted, adunit_deleted_bak, adunitgroup_adunit_xref,
 #app_category, appinfo, audiencesegment, audittrail, buyer, conversiontag_order_xref, 
@@ -442,11 +433,6 @@ def parse_request():
 		obj_limit = int(flask.request.args.get('objectLimit'))
 	except:
 		obj_limit = 100
-
-	# if flask.request.args.get('showSQL') in ['True', 'true']:
-	# 	sql = True
-	# else:
-	# 	sql = False
 	
 	url = flask.request.args.get('uri')
 	test = ObjectTree(url, 'connections.txt')
@@ -469,10 +455,6 @@ def parse_request():
 	statistics = test.get_output_stats(output)
 	stats = {'types': statistics[0], 'max_depth': max_depth, 'total_non-deleted_objects': statistics[1]}
 	test.root_logger.info('SENDING RESPONSE')
-	# if sql:
-	# 	return flask.jsonify({'network': output, 'sqlQueries': test.queries, 'statistics': stats})
-	# else:
-	# 	return flask.jsonify({'network': output, 'statistics': stats})
 	return flask.jsonify({'network': output, 'sqlQueries': test.queries, 'statistics': stats})
 
 @app.route('/api/getTypes', methods=['GET'])
