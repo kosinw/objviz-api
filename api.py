@@ -382,24 +382,25 @@ class ObjectTree:
 		type_full_dict = {}
 		total = 0
 		for key in output.keys():
-			try:
-				type_dict[output[key]['type']] += 1
-			except:
-				type_dict[output[key]['type']] = 1
-			try:
-				type_full_dict[output[key]['type_full']] += 1
-			except:
-				type_full_dict[output[key]['type_full']] = 1
-			total += 1
+			if output[key]['deleted'] == "0":
+				try:
+					type_dict[output[key]['type']] += 1
+				except:
+					type_dict[output[key]['type']] = 1
+				try:
+					type_full_dict[output[key]['type_full']] += 1
+				except:
+					type_full_dict[output[key]['type_full']] = 1
+				total += 1
 		final_stats = {}
 		for key in type_dict.keys():
-			final_stats[key] = {'count': type_dict[key], 'percent_of_total': (type_dict[key]/total)*100}
+			final_stats[key + "(" + str(type_dict[key]) + "/" + str(int(np.rint((type_dict[key]/total)*100))) + "%)"] = {'count': type_dict[key], 'percent_of_total': (type_dict[key]/total)*100}
 			for k in type_full_dict.keys():
 				if k == None:
 					pass
 				elif k.startswith(key):
-					final_stats[key][k] = {'count': type_full_dict[k], 'percent_of_total': (type_full_dict[k]/total)*100, 'percent_of_' + key + '(s)': (type_full_dict[k]/type_dict[key])*100}
-		return final_stats
+					final_stats[key + "(" + str(type_dict[key]) + "/" + str(int(np.rint((type_dict[key]/total)*100))) + "%)"][k + "(" + str(type_full_dict[k]) + "/" + str(int(np.rint((type_full_dict[k]/total)*100))) + "%)"] = {'count': type_full_dict[k], 'percent_of_total': (type_full_dict[k]/total)*100, 'percent_of_' + key + '(s)': (type_full_dict[k]/type_dict[key])*100}
+		return (final_stats, total)
 
 #print(test.query_current_node_info('1610767417', 'adunitgroup'))
 #adunitgroup 1610767417
@@ -410,7 +411,7 @@ class ObjectTree:
 #deal 1610619602
 #customer 497
 
-#EMPTY TALBES:
+#EMPTY TALBES IN DB DUMP:
 #acl, ad_deleted, ad_deleted_bak, adunit_deleted, adunit_deleted_bak, adunitgroup_adunit_xref,
 #app_category, appinfo, audiencesegment, audittrail, buyer, conversiontag_order_xref, 
 #creative_deleted, creative_deleted_bak, datapull, endpoint, feecap, floorrule, lineitem_deleted,
@@ -442,6 +443,10 @@ def parse_request():
 	except:
 		obj_limit = 100
 
+	# if flask.request.args.get('showSQL') in ['True', 'true']:
+	# 	sql = True
+	# else:
+	# 	sql = False
 	if flask.request.args.get('depthFirst') in ["True", "true"]:
 		df = True
 	else:
@@ -457,9 +462,13 @@ def parse_request():
 	test.cur.close()
 	test.con.close()
 	test.root_logger.info(str(len(output)) + " OBJECTS FOUND")
-	stats = {'types': test.get_output_stats(output), 'max_depth': max_depth}
+	statistics = test.get_output_stats(output)
+	stats = {'types': statistics[0], 'max_depth': max_depth, 'total_not_deleted': statistics[1]}
 	test.root_logger.info('SENDING RESPONSE')
-
+	# if sql:
+	# 	return flask.jsonify({'network': output, 'sqlQueries': test.queries, 'statistics': stats})
+	# else:
+	# 	return flask.jsonify({'network': output, 'statistics': stats})
 	return flask.jsonify({'network': output, 'sqlQueries': test.queries, 'statistics': stats})
 
 @app.route('/api/getTypes', methods=['GET'])
